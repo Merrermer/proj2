@@ -90,7 +90,6 @@ def buy_simulation(orderbook, investment):
         # del orderbook['asks'][price]
         remaining_investment -= amount
         total_shares += quantity
-    print('你把买单全吃了真牛逼')
     return
 
 def sell_simulation(orderbook, sell_quantity):
@@ -113,7 +112,6 @@ def sell_simulation(orderbook, sell_quantity):
         total_amount += quantity * price
         # del orderbook['bids'][price]
 
-    print('盘都被你砸穿了')
     return
 
 
