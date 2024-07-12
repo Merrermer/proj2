@@ -6,8 +6,8 @@ from typing import List, Dict
 import queue
 import json
 from typing import List, Callable
-from process import process_message
-import process
+import utils
+import dictionarize
 import multiprocessing
 
 
@@ -23,7 +23,7 @@ class OrderBookClient:
         self.__ws.on_open = self.__on_open
         self.__lookup_snapshot_id: Dict[str, int] = dict()
         self.__lookup_update_id: Dict[str, int] = dict()
-        self.__orderbook = dict()
+        self.__orderbooks = dict()
         self.__closed = False
 
         self.__message_queue = queue.Queue()
@@ -51,33 +51,39 @@ class OrderBookClient:
         data = json.loads(message)
         update_id_low = data.get("U")
         update_id_upp = data.get("u")
-        if update_id_low is None:
+
+
+        if update_id_low is None:       #the first message contains no information, so we just skip and return nothing
             __e = time.time()
             print(f'handletime:{__e-__s:8f}')
             return
+        
         
         symbol = data.get("s")
         snapshot_id = self.__lookup_snapshot_id.get(symbol)
-        if snapshot_id is None:
+        if snapshot_id is None: #If we never got a snapshot of the orderbook, we request one
             d = self.get_snapshot(symbol)
-            self.__orderbook[symbol] = process.message_to_orderbookd(d)
-            self.__message_callback(self.__orderbook[symbol], symbol)
+            self.__orderbooks[symbol] = dictionarize.message_to_orderbookd(d)
+            self.__message_callback(self.__orderbooks[symbol], symbol) # do computations based on the orderbook
             __e = time.time()
             print(f'handletime:{__e-__s:8f}')
             return 
-        elif update_id_upp < snapshot_id:
+        elif update_id_upp < snapshot_id: # The snapshot is newer than the latest message, which means some messages must be obmitted.
             return
         
-        self.__orderbook[symbol] = process.update_orderbook(self.__orderbook[symbol], data)
-        self.__message_callback(self.__orderbook[symbol], symbol)
+
+        self.__orderbooks[symbol] = dictionarize.update_orderbook(self.__orderbooks[symbol], data) # update the latest diff message on orderbook
+        self.__message_callback(self.__orderbooks[symbol], symbol)
+
 
         prev_update_id = self.__lookup_update_id.get(symbol)
-        if prev_update_id is None:
+        
+        if prev_update_id is None: # assert the messages are continuous
             assert update_id_low <= snapshot_id <= update_id_upp
         else:
             assert update_id_low == prev_update_id + 1
 
-        self.__lookup_update_id[symbol] = update_id_upp
+        self.__lookup_update_id[symbol] = update_id_upp # update the latest id
         __e = time.time()
         print(f'handletime:{__e-__s:8f}')
 
@@ -93,7 +99,7 @@ class OrderBookClient:
             subscribe_message = {
                 "method": "SUBSCRIBE",
                 "params": [
-                    f"{symbol.lower()}@depth@100ms"
+                    f"{symbol.lower()}@depth"
                 ],
                 "id": 1
             }
@@ -130,11 +136,11 @@ class OrderBookClient:
 
 def main():
     symbols = ["BTCUSDT"]
-    orderbook_client = OrderBookClient(symbols, process_message)
+    orderbook_client = OrderBookClient(symbols, utils.process_message)
     orderbook_client.start()
 
 def orderbook_timer(time, symbol):
-    __orderbook_client = OrderBookClient([symbol], process_message)
+    __orderbook_client = OrderBookClient([symbol], utils.process_message)
     __ws_thread = threading.Thread(target=__orderbook_client.start)
     __ws_thread.start()
     __timer = threading.Timer(time, __orderbook_client.stop)
@@ -143,11 +149,9 @@ def orderbook_timer(time, symbol):
 
 
 if __name__ == '__main__':
-    #symbols = ['BTCUSDT']
-    symbols = ["BTCUSDT", "DOGEUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "PEPEUSDT", "NOTUSDT", "WIFUSDT"]
+    symbols = ['BTCUSDT']
+    #symbols = ["BTCUSDT", "DOGEUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "PEPEUSDT", "NOTUSDT", "WIFUSDT"]
     from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
     import threading
     with ThreadPoolExecutor(max_workers=len(symbols)) as executor:
-        futures = {executor.submit(orderbook_timer, 15, symbol): symbol for symbol in symbols}
-
-
+        futures = {executor.submit(orderbook_timer, 3, symbol): symbol for symbol in symbols}
