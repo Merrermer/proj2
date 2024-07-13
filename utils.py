@@ -12,7 +12,7 @@ def process_message(data: dict, symbol: str):
     start = time.time()
     print(f'symbol: {symbol},', end = ' ')
     #bids_vol, asks_vol = ask_bid_amount(data)
-    buy_simulation(orderbook=data, investment = 10_000_000)
+    buy_simulation(orderbook=data, investment = 1_000_000)
     end = time.time()
     print(f'processed in {end-start:.6f} seconds', end = ' ')
     return
@@ -57,15 +57,17 @@ def buy_simulation(orderbook, investment):
             remaining_quantity = remaining_investment / price
             total_shares += remaining_quantity
             print(f'Total shares bought: {total_shares}, the price is raised to {price}')
-            # orderbook['asks'][price] -= remaining_quantity
-            # if orderbook['asks'][price] == 0:
-            #     del orderbook['asks'][price]
+
+            orderbook['asks'][price] -= remaining_quantity # this part is to apply your simulated buy order to the local orderbook 
+            if orderbook['asks'][price] == 0:
+                del orderbook['asks'][price]
+
             return price, total_shares
         
-        # del orderbook['asks'][price]
+        del orderbook['asks'][price]
         remaining_investment -= amount
         total_shares += quantity
-    print('你把买单全吃了真牛逼')
+    print(f'You have traded all the buy orders in the order book, and the highest transaction price is {price}')
     return
 
 def sell_simulation(orderbook, sell_quantity):
@@ -76,16 +78,16 @@ def sell_simulation(orderbook, sell_quantity):
 
     for price, quantity in sorted_bids:
         if remaining_quantity <= quantity:
-
             total_amount += remaining_quantity * price
-            # orderbook['bids'][price] -= remaining_quantity
-            # if orderbook['bids'][price] == 0:
-            #     del orderbook['bids'][price]
+
+            orderbook['bids'][price] -= remaining_quantity
+            if orderbook['bids'][price] == 0:
+                del orderbook['bids'][price] # this part is to apply your simulated sell order to the local orderbook 
             print(f'Total amount received: {total_amount}, the price is reduced to {price}')
             return price, total_amount, orderbook
         
         remaining_quantity -= quantity
         total_amount += quantity * price
-        # del orderbook['bids'][price]
-    print('盘都被你砸穿了')
+        del orderbook['bids'][price]
+    print(f'You have traded all the sell orders in the order book, and the lowest transaction price is {price}')
     return
