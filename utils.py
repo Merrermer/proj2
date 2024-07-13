@@ -2,7 +2,7 @@ import torch
 import json
 import numpy as np
 import time
-import threading
+import sort_gpu
 
 device_gpu = torch.device("cuda")
 
@@ -46,12 +46,14 @@ def vwap(orderbook):
 
 
 def buy_simulation(orderbook, investment):
-    all_orders = sorted(orderbook['asks'].items())
+    # all_orders = sorted(orderbook['asks'].items())
+    sorted_asks = sort_gpu.merge_sort(np.array(list(orderbook['asks'].keys())))
     
     remaining_investment = investment
     total_shares = 0
 
-    for price, quantity in all_orders:
+    for price in sorted_asks:
+        quantity = orderbook['asks'][price]
         amount = price * quantity
         
         if remaining_investment <= amount:
@@ -72,12 +74,14 @@ def buy_simulation(orderbook, investment):
     return price, total_shares, logging
 
 def sell_simulation(orderbook, sell_quantity):
-    sorted_bids = sorted(orderbook['bids'].items(), reverse=True)
+    #sorted_bids = sorted(orderbook['bids'].items(), reverse=True)
+    sorted_bids = sort_gpu.merge_sort(np.array(list(orderbook['bids'].keys())), reverse=True)
     
     remaining_quantity = sell_quantity
     total_amount = 0
 
-    for price, quantity in sorted_bids:
+    for price in sorted_bids:
+        quantity = orderbook['bids'][price]
         if remaining_quantity <= quantity:
             total_amount += remaining_quantity * price
 
