@@ -79,7 +79,7 @@ class OrderBookClient:
         prev_update_id = self.__lookup_update_id.get(symbol)
         
         if prev_update_id is None: # assert the messages are continuous
-            assert update_id_low <= snapshot_id <= update_id_upp
+            assert update_id_low <= snapshot_id <= update_id_upp +1
         else:
             assert update_id_low == prev_update_id + 1
 
@@ -149,9 +149,9 @@ def orderbook_timer(time, symbol):
 
 
 if __name__ == '__main__':
-    symbols = ['BTCUSDT']
-    #symbols = ["BTCUSDT", "DOGEUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "PEPEUSDT", "NOTUSDT", "WIFUSDT"]
+    #symbols = ['BTCUSDT']
+    symbols = ["BTCUSDT", "DOGEUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "PEPEUSDT", "NOTUSDT", "WIFUSDT"]
     from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
     import threading
     with ThreadPoolExecutor(max_workers=len(symbols)) as executor:
-        futures = {executor.submit(orderbook_timer, 3, symbol): symbol for symbol in symbols}
+        futures = {executor.submit(orderbook_timer, 15, symbol): symbol for symbol in symbols}
