@@ -42,7 +42,7 @@ def vwap(orderbook):
     vwap_bids = total_value_bids / total_quantity_bids if total_quantity_bids != 0 else 0
     
     logging = str(f'wvap_bids:{vwap_bids}, wvap_asks:{vwap_asks},')
-    return vwap_asks.item(), vwap_bids.item(), logging
+    return vwap_asks, vwap_bids, logging
 
 
 def buy_simulation(orderbook, investment):
@@ -57,7 +57,7 @@ def buy_simulation(orderbook, investment):
         if remaining_investment <= amount:
             remaining_quantity = remaining_investment / price
             total_shares += remaining_quantity
-            logging = str(f'Total shares bought: {total_shares}, the price is raised to {price}')
+            logging = str(f'Total shares bought: {total_shares}, the price is raised to {price}. ')
 
             orderbook['asks'][price] -= remaining_quantity # this part is to apply your simulated buy order to the local orderbook 
             if orderbook['asks'][price] == 0:

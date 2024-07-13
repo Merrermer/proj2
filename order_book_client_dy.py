@@ -25,6 +25,7 @@ class OrderBookClient:
         self.__lookup_update_id: Dict[str, int] = dict()
         self.__orderbooks = dict()
         self.__closed = False
+        self.__lock = threading.Lock()
 
         self.__message_queue = queue.Queue()
         self.__message_thread = threading.Thread(target=self.__process_messages)
@@ -41,7 +42,7 @@ class OrderBookClient:
     def __process_messages(self):
         while not self.__closed:
             try:
-                message = self.__message_queue.get(timeout=2)
+                message = self.__message_queue.get(timeout=1)
                 self.__handle_message(message)
             except queue.Empty:
                 continue
@@ -71,10 +72,12 @@ class OrderBookClient:
         elif update_id_upp < snapshot_id: # The snapshot is newer than the latest message, which means some messages must be obmitted.
             return
         
-
+        self.__lock.acquire()
         self.__orderbooks[symbol] = dictionarize.update_orderbook(self.__orderbooks[symbol], data) # update the latest diff message on orderbook
         self.__message_callback(self.__orderbooks[symbol], symbol)
-
+        __e = time.time()
+        print(f'handletime:{__e-__s:8f}')
+        self.__lock.release()
 
         prev_update_id = self.__lookup_update_id.get(symbol)
         
@@ -84,8 +87,6 @@ class OrderBookClient:
             assert update_id_low == prev_update_id + 1
 
         self.__lookup_update_id[symbol] = update_id_upp # update the latest id
-        __e = time.time()
-        print(f'handletime:{__e-__s:8f}')
 
     def __on_error(self, _ws, error):
         print(f"Encountered error: {error}")
