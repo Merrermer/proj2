@@ -2,6 +2,7 @@ import torch
 import json
 import numpy as np
 import time
+import threading
 
 device_gpu = torch.device("cuda")
 
@@ -10,18 +11,18 @@ def to_tensor(l):
 
 def process_message(data: dict, symbol: str):
     start = time.time()
-    print(f'symbol: {symbol},', end = ' ')
-    #bids_vol, asks_vol = ask_bid_amount(data)
-    buy_simulation(orderbook=data, investment = 1_000_000)
+    m_0 = str(f'symbol: {symbol},')
+    vwap_asks, vwap_bids, m_1 = vwap(data)
+    price, total_shares, m_2 = buy_simulation(orderbook=data, investment = 1_000_000)
     end = time.time()
-    print(f'processed in {end-start:.6f} seconds', end = ' ')
+    print(m_0+m_1+m_2+f'processed in {end-start:.6f} seconds')
     return
 
 def ask_bid_amount(orderbook):
     bids_vol = torch.dot(to_tensor(list(orderbook['bids'].keys())), to_tensor(list(orderbook['bids'].values()))) 
     asks_vol = torch.dot(to_tensor(list(orderbook['asks'].keys())), to_tensor(list(orderbook['asks'].values())))
-    print(f'new_bids_amount:{bids_vol}, new_asks_amount:{asks_vol},', end = ' ') 
-    return asks_vol, bids_vol
+    logging = str(f'new_bids_amount:{bids_vol}, new_asks_amount:{asks_vol}, ')
+    return asks_vol, bids_vol, logging
 
 def vwap(orderbook):
     ask_prices = to_tensor(list(orderbook['asks'].keys()))
@@ -40,8 +41,8 @@ def vwap(orderbook):
     
     vwap_bids = total_value_bids / total_quantity_bids if total_quantity_bids != 0 else 0
     
-    print(f'wvap_bids:{vwap_bids}, wvap_asks:{vwap_asks},', end = ' ')
-    return vwap_asks.item(), vwap_bids.item()
+    logging = str(f'wvap_bids:{vwap_bids}, wvap_asks:{vwap_asks},')
+    return vwap_asks.item(), vwap_bids.item(), logging
 
 
 def buy_simulation(orderbook, investment):
@@ -56,19 +57,19 @@ def buy_simulation(orderbook, investment):
         if remaining_investment <= amount:
             remaining_quantity = remaining_investment / price
             total_shares += remaining_quantity
-            print(f'Total shares bought: {total_shares}, the price is raised to {price}')
+            logging = str(f'Total shares bought: {total_shares}, the price is raised to {price}')
 
             orderbook['asks'][price] -= remaining_quantity # this part is to apply your simulated buy order to the local orderbook 
             if orderbook['asks'][price] == 0:
                 del orderbook['asks'][price]
 
-            return price, total_shares
+            return price, total_shares, logging
         
         del orderbook['asks'][price]
         remaining_investment -= amount
         total_shares += quantity
-    print(f'You have traded all the buy orders in the order book, and the highest transaction price is {price}')
-    return
+    logging = str(f'You have traded all the buy orders in the order book, and the highest transaction price is {price}. ')
+    return price, total_shares, logging
 
 def sell_simulation(orderbook, sell_quantity):
     sorted_bids = sorted(orderbook['bids'].items(), reverse=True)
@@ -83,11 +84,11 @@ def sell_simulation(orderbook, sell_quantity):
             orderbook['bids'][price] -= remaining_quantity
             if orderbook['bids'][price] == 0:
                 del orderbook['bids'][price] # this part is to apply your simulated sell order to the local orderbook 
-            print(f'Total amount received: {total_amount}, the price is reduced to {price}')
-            return price, total_amount, orderbook
+            logging = str(f'Total amount received: {total_amount}, the price is reduced to {price}. ')
+            return price, total_amount, orderbook, logging
         
         remaining_quantity -= quantity
         total_amount += quantity * price
         del orderbook['bids'][price]
-    print(f'You have traded all the sell orders in the order book, and the lowest transaction price is {price}')
-    return
+    logging = str(f'You have traded all the sell orders in the order book, and the lowest transaction price is {price}. ')
+    return price, total_amount, orderbook, logging
