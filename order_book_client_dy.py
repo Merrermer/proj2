@@ -23,6 +23,7 @@ class OrderBookClient:
         self.__ws.on_open = self.__on_open
         self.__lookup_snapshot_id: Dict[str, int] = dict()
         self.__lookup_update_id: Dict[str, int] = dict()
+        self.orderbook_cache: List[dict] = []
         self.__orderbooks = dict()
         self.__closed = False
         self.__lock = threading.Lock()
@@ -31,6 +32,7 @@ class OrderBookClient:
         self.__message_thread = threading.Thread(target=self.__process_messages)
         self.__message_thread.daemon = True
 
+
     def __connect(self):
         self.__message_thread.start()
         self.__ws.run_forever()
@@ -38,6 +40,12 @@ class OrderBookClient:
 
     def __on_message(self, _ws, message):
         self.__message_queue.put(message)
+
+    def __update_cache(self, orderbook: Dict):
+        self.orderbook_cache.append(orderbook)
+        if len(self.orderbook_cache) > 50:
+            self.orderbook_cache.pop(0)
+
 
     def __process_messages(self):
         while not self.__closed:
@@ -56,7 +64,7 @@ class OrderBookClient:
 
         if update_id_low is None:       #the first message contains no information, so we just skip and return nothing
             __e = time.time()
-            print(f'handletime:{__e-__s:8f}')
+            #print(f'handletime:{__e-__s:8f}')
             return
         
         
@@ -65,18 +73,20 @@ class OrderBookClient:
         if snapshot_id is None: #If we never got a snapshot of the orderbook, we request one
             d = self.get_snapshot(symbol)
             self.__orderbooks[symbol] = dictionarize.message_to_orderbookd(d)
+            self.__update_cache(self.__orderbooks[symbol])
             self.__message_callback(self.__orderbooks[symbol], symbol) # do computations based on the orderbook
             __e = time.time()
-            print(f'handletime:{__e-__s:8f}')
+            #print(f'handletime:{__e-__s:8f}')
             return 
         elif update_id_upp < snapshot_id: # The snapshot is newer than the latest message, which means some messages must be obmitted.
             return
         
         self.__lock.acquire()
         self.__orderbooks[symbol] = dictionarize.update_orderbook(self.__orderbooks[symbol], data) # update the latest diff message on orderbook
+        self.__update_cache(self.__orderbooks[symbol])
         self.__message_callback(self.__orderbooks[symbol], symbol)
         __e = time.time()
-        print(f'handletime:{__e-__s:8f}')
+        #print(f'handletime:{__e-__s:8f}')
         self.__lock.release()
 
         prev_update_id = self.__lookup_update_id.get(symbol)
@@ -90,7 +100,7 @@ class OrderBookClient:
 
     def __on_error(self, _ws, error):
         print(f"Encountered error: {error}")
-
+    
     def __on_close(self, _ws, _close_status_code, _close_msg):
         print("Connection closed")
 
@@ -150,9 +160,9 @@ def orderbook_timer(time, symbol):
 
 
 if __name__ == '__main__':
-    #symbols = ['BTCUSDT']
-    symbols = ["BTCUSDT", "DOGEUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "PEPEUSDT", "NOTUSDT", "WIFUSDT"]
+    symbols = ['BTCUSDT']
+    #symbols = ["BTCUSDT", "DOGEUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "PEPEUSDT", "NOTUSDT", "WIFUSDT"]
     from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
     import threading
-    with ThreadPoolExecutor(max_workers=len(symbols)) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(orderbook_timer, 15, symbol): symbol for symbol in symbols}

@@ -41,7 +41,7 @@ def vwap(orderbook):
     
     vwap_bids = total_value_bids / total_quantity_bids if total_quantity_bids != 0 else 0
     
-    logging = str(f'wvap_bids:{vwap_bids}, wvap_asks:{vwap_asks},')
+    logging = str(f'vwap_bids:{vwap_bids}, vwap_asks:{vwap_asks},')
     return vwap_asks, vwap_bids, logging
 
 
